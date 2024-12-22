@@ -1,13 +1,19 @@
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
+import signal
 
 app = Flask(__name__)
 
+# Signal handler for enforcing timeouts
+class TimeoutException(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutException("Execution exceeded time limit")
+
+# Scraping logic
 def scrape_url(url):
-    """Scrapes content from a single URL."""
     try:
         response = requests.get(url, timeout=5)
         if response.status_code != 200:
@@ -21,33 +27,26 @@ def scrape_url(url):
 
 @app.route('/scrape_weather', methods=['POST'])
 def scrape_weather():
-    """API endpoint to scrape and combine weather data from provided URLs with a strict total time limit."""
+    """Scrape URLs and enforce a strict 8-second timeout."""
     data = request.get_json()
     if not data or 'urls' not in data:
         return jsonify({"error": "Invalid input JSON. 'urls' key is required."}), 400
 
-    urls = data['urls']
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(8)  # Set timeout for the request
+
     combined_content = []
-    start_time = time.time()
-    time_limit = 3  # Ensure we respond before the 10-second gateway timeout
-
-    with ThreadPoolExecutor() as executor:
-        # Submit scraping tasks to the executor
-        futures = {executor.submit(scrape_url, url): url for url in urls}
-
-        for future in as_completed(futures):
-            # Check if the total execution time has exceeded the limit
-            if time.time() - start_time >= time_limit:
-                break
-            content = future.result()
+    try:
+        urls = data['urls']
+        for url in urls:
+            content = scrape_url(url)
             if content:
                 combined_content.append(content)
+        signal.alarm(0)  # Disable alarm after success
+    except TimeoutException:
+        return jsonify({"content": "Scraping stopped due to timeout."}), 408
 
-    # Combine all content into a single string
-    full_content = ' '.join(combined_content)
-
-    # Return response before the gateway timeout
-    return jsonify({"content": full_content})
+    return jsonify({"content": ' '.join(combined_content)})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
