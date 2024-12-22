@@ -1,52 +1,39 @@
 from flask import Flask, request, jsonify
-import requests
 from bs4 import BeautifulSoup
-import signal
+import requests
+import concurrent.futures
 
 app = Flask(__name__)
 
-# Signal handler for enforcing timeouts
-class TimeoutException(Exception):
-    pass
-
-def timeout_handler(signum, frame):
-    raise TimeoutException("Execution exceeded time limit")
-
-# Scraping logic
-def scrape_url(url):
+def scrape_content(url):
+    """Function to scrape content from the given URL."""
     try:
         response = requests.get(url, timeout=5)
-        if response.status_code != 200:
-            return ""
-        soup = BeautifulSoup(response.text, 'html.parser')
-        body_tags = soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
-        content = ' '.join(tag.get_text(strip=True) for tag in body_tags)
-        return content
-    except requests.RequestException:
-        return ""
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            return {"title": soup.title.string if soup.title else "No Title Found"}
+        else:
+            return {"error": f"HTTP Error: {response.status_code}"}
+    except requests.RequestException as e:
+        return {"error": str(e)}
 
 @app.route('/scrape_weather', methods=['POST'])
 def scrape_weather():
-    """Scrape URLs and enforce a strict 8-second timeout."""
+    """API endpoint to scrape content."""
     data = request.get_json()
-    if not data or 'urls' not in data:
-        return jsonify({"error": "Invalid input JSON. 'urls' key is required."}), 400
+    url = data.get("url")
 
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(8)  # Set timeout for the request
+    if not url:
+        return jsonify({"error": "URL is required"}), 400
 
-    combined_content = []
-    try:
-        urls = data['urls']
-        for url in urls:
-            content = scrape_url(url)
-            if content:
-                combined_content.append(content)
-        signal.alarm(0)  # Disable alarm after success
-    except TimeoutException:
-        return jsonify({"content": "Scraping stopped due to timeout."}), 408
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future = executor.submit(scrape_content, url)
+        try:
+            result = future.result(timeout=6)  # Timeout in seconds
+        except concurrent.futures.TimeoutError:
+            return jsonify({"error": "Scraping timed out"}), 504
 
-    return jsonify({"content": ' '.join(combined_content)})
+    return jsonify(result)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(debug=True)
