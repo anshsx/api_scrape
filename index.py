@@ -17,7 +17,10 @@ def scrape_weather():
     for url in urls:
         try:
             response = requests.get(url, timeout=5)
-            response.raise_for_status()
+            if response.status_code != 200:
+                # Skip URLs that don't return a 200 status code
+                continue
+
             soup = BeautifulSoup(response.text, 'html.parser')
 
             # Extract relevant text content
@@ -26,7 +29,7 @@ def scrape_weather():
 
             combined_content.append(content)
         except requests.RequestException:
-            # Skip this URL and continue with the next
+            # Skip URLs that raise an exception
             continue
 
     # Combine all content into a single string
