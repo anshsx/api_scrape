@@ -19,7 +19,7 @@ def scrape_url(url):
     except requests.RequestException:
         return ""
 
-@app.route('/api/scrape', methods=['POST'])
+@app.route('/scrape_weather', methods=['POST'])
 def scrape_weather():
     """API endpoint to scrape and combine weather data from provided URLs with a 9-second timeout."""
     data = request.get_json()
