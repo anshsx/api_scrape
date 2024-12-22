@@ -1,39 +1,41 @@
 from flask import Flask, request, jsonify
-from bs4 import BeautifulSoup
 import requests
-import concurrent.futures
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-def scrape_content(url):
-    """Function to scrape content from the given URL."""
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            return {"title": soup.title.string if soup.title else "No Title Found"}
-        else:
-            return {"error": f"HTTP Error: {response.status_code}"}
-    except requests.RequestException as e:
-        return {"error": str(e)}
-
 @app.route('/scrape_weather', methods=['POST'])
 def scrape_weather():
-    """API endpoint to scrape content."""
+    """API endpoint to scrape and combine weather data from provided URLs."""
     data = request.get_json()
-    url = data.get("urls")
+    if not data or 'urls' not in data:
+        return jsonify({"error": "Invalid input JSON. 'urls' key is required."}), 400
 
-    if not url:
-        return jsonify({"error": "URL is required"}), 400
+    urls = data['urls']
+    combined_content = []
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future = executor.submit(scrape_content, url)
+    for url in urls:
         try:
-            result = future.result(timeout=6)  # Timeout in seconds
-        except concurrent.futures.TimeoutError:
-            return jsonify({"error": "Scraping timed out"}), 504
+            response = requests.get(url, timeout=5)
+            if response.status_code != 200:
+                # Skip URLs that don't return a 200 status code
+                continue
 
-    return jsonify(result)
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Extract relevant text content
+            body_tags = soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+            content = ' '.join(tag.get_text(strip=True) for tag in body_tags)
+
+            combined_content.append(content)
+        except requests.RequestException:
+            # Skip URLs that raise an exception
+            continue
+
+    # Combine all content into a single string
+    full_content = ' '.join(combined_content)
+
+    return jsonify({"content": full_content})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
