@@ -36,7 +36,7 @@ def scrape_weather():
 
         for future in as_completed(futures):
             # Stop processing if 9 seconds have passed
-            if time.time() - start_time > 9:
+            if time.time() - start_time > 6:
                 break
             content = future.result()
             if content:
