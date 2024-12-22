@@ -21,7 +21,7 @@ def scrape_url(url):
 
 @app.route('/scrape_weather', methods=['POST'])
 def scrape_weather():
-    """API endpoint to scrape and combine weather data from provided URLs with a 9-second timeout."""
+    """API endpoint to scrape and combine weather data from provided URLs with a strict total time limit."""
     data = request.get_json()
     if not data or 'urls' not in data:
         return jsonify({"error": "Invalid input JSON. 'urls' key is required."}), 400
@@ -29,14 +29,15 @@ def scrape_weather():
     urls = data['urls']
     combined_content = []
     start_time = time.time()
+    time_limit = 6  # Ensure we respond before the 10-second gateway timeout
 
     with ThreadPoolExecutor() as executor:
         # Submit scraping tasks to the executor
         futures = {executor.submit(scrape_url, url): url for url in urls}
 
         for future in as_completed(futures):
-            # Stop processing if 9 seconds have passed
-            if time.time() - start_time > 6:
+            # Check if the total execution time has exceeded the limit
+            if time.time() - start_time >= time_limit:
                 break
             content = future.result()
             if content:
@@ -45,6 +46,7 @@ def scrape_weather():
     # Combine all content into a single string
     full_content = ' '.join(combined_content)
 
+    # Return response before the gateway timeout
     return jsonify({"content": full_content})
 
 if __name__ == "__main__":
