@@ -25,8 +25,8 @@ def scrape_weather():
             content = ' '.join(tag.get_text(strip=True) for tag in body_tags)
 
             combined_content.append(content)
-        except requests.RequestException as e:
-            print(f"Failed to scrape {url}: {e}")
+        except requests.RequestException:
+            # Skip this URL and continue with the next
             continue
 
     # Combine all content into a single string
