@@ -21,7 +21,7 @@ def scrape_content(url):
 def scrape_weather():
     """API endpoint to scrape content."""
     data = request.get_json()
-    url = data.get("url")
+    url = data.get("urls")
 
     if not url:
         return jsonify({"error": "URL is required"}), 400
