@@ -29,7 +29,7 @@ def scrape_weather():
     urls = data['urls']
     combined_content = []
     start_time = time.time()
-    time_limit = 6  # Ensure we respond before the 10-second gateway timeout
+    time_limit = 3  # Ensure we respond before the 10-second gateway timeout
 
     with ThreadPoolExecutor() as executor:
         # Submit scraping tasks to the executor
