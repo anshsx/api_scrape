@@ -1,4 +1,7 @@
-Flask
-requests
-beautifulsoup4
-gunicorn
+fastapi
+python-multipart
+python-docx
+openpyxl
+pandas
+PyPDF2
+pdfminer.six
