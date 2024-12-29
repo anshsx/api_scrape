@@ -26,18 +26,27 @@ def get_bing_results(query):
     bing_url = f"https://www.bing.com/search?q={query}&count=10"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+    
     response = requests.get(bing_url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
     
-    results = []
-    for b in soup.find_all('li', class_='b_algo'):
-        title = b.find('h2').text
-        link = b.find('a')['href']
-        snippet = b.find('p').text if b.find('p') else 'No snippet'
-        favicon_url = get_favicon_url(link)
-        results.append({'title': title, 'url': link, 'snippet': snippet, 'favicon': favicon_url})
-    
-    return results
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        results = []
+        for b in soup.find_all('li', class_='b_algo'):
+            title_tag = b.find('h2')
+            if title_tag:
+                title = title_tag.text
+                link = b.find('a')['href']
+                snippet_tag = b.find('p')
+                snippet = snippet_tag.text if snippet_tag else 'No snippet'
+                favicon_url = get_favicon_url(link)
+
+                results.append({'title': title, 'url': link, 'snippet': snippet, 'favicon': favicon_url})
+
+        return results
+    else:
+        return []  # If Bing request fails, return an empty list
 
 def get_favicon_url(url):
     # Extract domain from the URL and construct the favicon URL
